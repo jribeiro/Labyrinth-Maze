@@ -1,0 +1,134 @@
+body {
+    background: #F2F2F2;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    color: #ccc;
+    
+    -webkit-transition: background-color 500ms linear;
+    -moz-transition: background-color 500ms linear;
+    -o-transition: background-color 500ms linear;
+    -ms-transition: background-color 500ms linear;
+    transition: background-color 500ms linear;
+}
+
+body.processing { background: #BDE8F2; }
+
+.processing #welcome,
+.error #welcome,
+.success #welcome {
+    display: none;
+}
+
+.processing #loading { display: block; }
+
+body.success { background: #9CEDC5; }
+.success #success { display: block; }
+
+#success h1 {
+    color: #9CEDC5;
+}
+
+
+body.error { background: #F1807F; }
+.error #error { display: block; }
+#error h1 {
+    color: #F1807F;
+}
+
+.hero-unit {
+    margin: 10px auto;
+    width: 95%;
+    font-size: 18px;
+    font-weight: 200;
+    line-height: 30px;
+    background-color: rgba(255,255,255,.7);
+    border-radius: 6px;
+    padding: 20px;
+    color: #333;
+    position: relative;
+}
+
+.hero-unit h1 {
+    font-size: 3.1em;
+    line-height: 1;
+    letter-spacing: -1px;
+    margin: 0 0 20px 0;
+}
+
+#form-maze {
+    display: block;
+}
+
+.hero-unit {
+    -webkit-transition: height 1000ms linear;
+    -moz-transition: height 1000ms linear;
+    -o-transition: height 1000ms linear;
+    -ms-transition: height 1000ms linear;
+    transition: height 1000ms linear;
+}
+
+
+#loading { 
+    cursor: wait;
+    background-color: rgba(0,0,0,0);
+    opacity: .8;
+    border-radius: 120px;
+    margin: 5% auto;
+    -moz-animation: loading .5s infinite linear;
+    -webkit-animation: loading .5s infinite linear;
+    animation: loading .5s infinite linear;
+    border: 5px solid #BDE8F2;
+    border-top: 5px solid rgba(0,0,0,0);
+    border-left: 5px solid rgba(0,0,0,0);
+    width: 150px;
+    height: 150px;
+}
+
+@keyframes loading {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+ @-moz-keyframes loading {
+    0% {
+        -moz-transform: rotate(0deg);
+    }
+
+    100% {
+        -moz-transform: rotate(360deg);
+    }
+}
+
+@-webkit-keyframes loading {
+    0% {
+        -webkit-transform: rotate(0deg);
+    }
+
+    100% {
+        -webkit-transform: rotate(360deg);
+    }
+}
+
+@media only screen and (min-width : 780px) {
+    
+    .hero-unit {
+       width: 700px;
+       margin: 60px auto;
+    }
+
+    .hero-unit h1 {
+        margin: 0.67em 0;
+    }
+
+}
+
+.hidden { display: none; }
+
+.glyphicon {
+    padding-right: 20px;
+    vertical-align: text-top;
+}

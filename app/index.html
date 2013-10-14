@@ -1,0 +1,78 @@
+<!doctype html>
+<!--[if lt IE 7]>      <html class="no-js lt-ie9 lt-ie8 lt-ie7"> <![endif]-->
+<!--[if IE 7]>         <html class="no-js lt-ie9 lt-ie8"> <![endif]-->
+<!--[if IE 8]>         <html class="no-js lt-ie9"> <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js"> <!--<![endif]-->
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <title>lbi</title>
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width">
+        <!-- Place favicon.ico and apple-touch-icon.png in the root directory -->
+        <!-- build:css(.tmp) styles/main.css -->
+        <link rel="stylesheet" href="styles/bootstrap.min.css">
+        <link rel="stylesheet" href="styles/main.css">
+        <!-- endbuild -->
+        <!-- build:js scripts/vendor/modernizr.js -->
+        <script src="bower_components/modernizr/modernizr.js"></script>
+        <!-- endbuild -->
+    </head>
+    <body class="">
+        <!--[if lt IE 10]>
+            <p class="browsehappy">You are using an <strong>outdated</strong> browser. Please <a href="http://browsehappy.com/">upgrade your browser</a> to improve your experience.</p>
+        <![endif]-->
+
+
+        <section class="hero-unit">
+            
+            <article id="welcome">
+                <h1>The <a target="_blank" href="http://labyrinth.lbi.co.uk/" rel="nofollow">Labyrinth</a> Challenge</h1>
+
+                <form id="maze-form" role="form" class="height-changes-trans">
+                    <div class="form-group">
+                        <label for="maze">Maze Name</label>
+                        <input required type="maze" class="form-control" id="maze-input" placeholder="easy">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Submit</button>
+                </form>
+            </article>
+
+            <article id="loading" class="hidden"></article>
+
+            <article id="error" class="hidden">
+                <h1>
+                    <span class="glyphicon glyphicon-remove-sign"></span>
+                    Oh Snaps!
+                </h1>
+                <p id="error-msg">An error occured</p>
+
+                <button class="btn btn-primary try-again">Try again</button>
+            </article>
+
+            <article id="success" class="hidden">
+                <h1><span class="glyphicon glyphicon-ok-circle"></span>Yay!</h1>
+
+                <p class="strong">This took: <span id="total-steps"></span></p>
+                
+                <pre id="result-path">me.teleport(pointB)</pre>
+
+                <button class="btn btn-primary try-again">Try again</button>
+                <button class="btn btn-success" id="submit-info">Submit</button>
+            </article>
+        </section>
+
+
+        <!-- build:js scripts/vendor.js -->
+        <!-- bower:js -->
+        <script src="scripts/plugins.js"></script>
+        <script src="bower_components/jquery/jquery.js"></script>
+        <!-- endbower -->
+        <!-- endbuild -->
+
+        <!-- build:js scripts/main.js -->
+        <script src="scripts/maze.js"></script>
+        <script src="scripts/main.js"></script>
+        <!-- endbuild -->
+    </body>
+</html>
