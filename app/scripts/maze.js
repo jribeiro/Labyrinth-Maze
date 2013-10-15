@@ -17,7 +17,8 @@ window.Maze = window.Maze || (function() {
 		this.startLocation 	= args.startLocation;			// Start Location - allows for starting the algorythm other than the normal starting point
 		this.exitPoint 		= null							// Keep a record of the exit point for faster looping
 		this.points 		= {}							// Store the points - this is usefull we need to consider only paths with
-		this.path 			= null							// Stores the path after building the graph
+		this.path 			= []							// Stores the path after building the graph
+		this.powerPills 	= []
 
 		this.init();
 
@@ -29,9 +30,8 @@ window.Maze = window.Maze || (function() {
 	Maze.prototype.init = function() {
 
 		var startPoint = this.getLocation(this.startLocation);
-		if(typeof startPoint !== 'undefined' && typeof startPoint.Exits !== 'undefined') {
-			this.points[startPoint.LocationId] = startPoint.LocationType;
-			this.BFS(startPoint.LocationId, this.exitsToLocations(startPoint.Exits));
+		if(typeof startPoint !== 'undefined') {
+			this.getPath(startPoint.id);
 		}
 		else{
 			var event = new CustomEvent('applicationError', { 'detail': 'Maze Name not Available' });
@@ -41,42 +41,55 @@ window.Maze = window.Maze || (function() {
 
 	Maze.prototype.getLocation = function(location){
 		var xmlhttp,
-			data;
+			data,
+			self = this;
 
 		// Sorry IE5/6 I really don't care bout you
 		xmlhttp = new XMLHttpRequest();
 
 		xmlhttp.onreadystatechange = function() {
 		    if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
+		        // Cache each request to avoid extra processing
 		        data = JSON.parse(xmlhttp.responseText);
+
+		        self.points[data.LocationId] = {
+		        	"id": data.LocationId
+		        ,	"adj": 	self.exitsToLocations(data.Exits)
+		        ,	"type": data.LocationType
+		        };
+
+		        if(data.LocationType == 'PowerPill')
+					self.powerPills.push(data.LocationId)
+				else if (data.LocationType == 'Exit')
+					self.exitPoint = data.LocationId;
+
+
 		    }
-		}
+		};
 
 		xmlhttp.open("GET", this.buildAjaxUrl(location), false);
 		xmlhttp.send();
-	
-		return data;
+		
+		return self.points[data.LocationId];
 	};
 
 	/* Based on Prof. Erik Demaine MIT lecture on Breadth-First Search: http://www.youtube.com/watch?v=s-CYnVz-uh4 */
-	Maze.prototype.BFS = function (locationId, adj) {
+	Maze.prototype.BFS = function (start) {
 		var level 		= {} 					// start-location = level 0
-		,	parent 		= {}
+		,	parents		= {}
 		,	i 			= 1
-		,	frontier 	= [locationId]
+		,	frontier 	= [start]
 		;
 
 		// set vars with starting points
-		level[locationId] 	= 0;
-		parent[locationId]	= null;
+		level[start] 	= 0;
+		parents[start]	= null;
 
 		while(0 < frontier.length) {
 			var next = [];
 
 			for (var j = frontier.length - 1; j >= 0; j--) {
 				var node 	= frontier[j];
-				if(node == "ce0ff34e-af40-45c3-b9df-751254908253,fd05a2e9-b275-4d3f-933c-99a9a96d6a53")
-					console.log(node)
 
 				if(typeof node === 'object')
 					node = node[0];
@@ -90,13 +103,9 @@ window.Maze = window.Maze || (function() {
 
 					if (typeof level[adjN] === 'undefined') {
 						level[adjN] 	= i;
+						parents[adjN] = node;
 						next.push(adjN); 	// Append this to the next processing list
 					}
-
-					if(typeof parent[adjN] === 'undefined' || !parent[adjN])
-						parent[adjN] = [node];
-					else
-						parent[adjN].push(node);
 
 				};
 			};
@@ -105,81 +114,94 @@ window.Maze = window.Maze || (function() {
 			i +=1;
 		}
 
-		// Loop through all possible paths
-		while(1) {
-			if (this.calculatePath(locationId, parent))
-				break;
+		return parents;
+	}
+
+	Maze.prototype.getPath = function(start) {
+
+		var parents = this.BFS(start);
+
+		if(this.powerPills.length === 0){
+			// No Power Pill in Maze, find the fastest route from S => E
+			this.path = this.calculate(start, this.exitPoint, parents);
 		}
+
+		else {
+			var minLength = -1;
+
+			for (var i = this.powerPills.length - 1; i >= 0; i--) {
+				// loop through each powerPill, check the shortest route that satisfies S => PP and PP => E
+				var pillParents = this.BFS(this.powerPills[i]);
+
+				var startToPill = this.calculate(start, this.powerPills[i], parents);
+				var pillToExit 	= this.calculate(this.powerPills[i], this.exitPoint, pillParents);
+
+				// Remove Power Pill from the middle to avoid duplication
+				pillToExit.pop();
+
+				var result = pillToExit.concat(startToPill);
+
+				if(minLength == -1 || result.length < minLength)
+					this.path = result;
+			};
+			
+		}
+
+		console.log(this.path)
+		console.log(this.path.length)
+
+		var event = new CustomEvent('success', { 'detail': {'total': this.path.length, 'data': this.path.reverse()} });
+		window.dispatchEvent(event);
+
 	}
 
 
-	Maze.prototype.getAdj = function(node) {
-		var point 	= this.getLocation(node);
+	Maze.prototype.getAdj = function(location) {
+		
+		var adj;
 
 		try {
-			var adj 	= point.Exits;	
-		} catch (e) {
-			throw new Error("No exits found for the node " + node);
-			var event = new CustomEvent('applicationError', { 'detail': 'Maze Name not Available' });
-			window.dispatchEvent(event);
+		   // try to get resource from cache
+		   adj = this.points[location].adj;
 		}
-
-		if(point.LocationType == 'Exit')
-			this.exitPoint = point.LocationId;
-
-		this.points[point.LocationId] = point.LocationType;
+		catch (e) {
+			// try to fetch it from the server
+			var point 	= this.getLocation(location);
+			
+			try{
+				adj = point.adj;	
+			}
+			catch (e) {
+				// Not possible to fetch, throwing error message event
+		   		var event = new CustomEvent('applicationError', { 'detail': 'Maze Name not Available' });
+				window.dispatchEvent(event);
+			}
+			
+		}
 		
-		return this.exitsToLocations(adj);
+		return adj;
 	}
 
-	Maze.prototype.calculatePath = function (location, paths) {
+	Maze.prototype.calculate = function (start, exit, paths) {
 		
-		if (this.exitPoint == null) {
+		if (exit == null) {
 			var event = new CustomEvent('applicationError', { 'detail': "I'm lossssst"});
 			window.dispatchEvent(event);
 			return;
 		}
 		
-		var results 		= [this.exitPoint];
-		var parent 			= paths[this.exitPoint];
-		var hasMoreRoutes 	= false,
-			powerPillPath 	= false;
+		var results = [exit];
+		var parent 	= paths[exit];
 		
-		while ( parent !== null) {
-
-			if(typeof parent == 'object' && parent.length > 1){
-				parent = parent.pop();
-				hasMoreRoutes = true;
-			}
-
-			// Check for PowerPill
-			powerPillPath = this.isPowerPill(parent);
-
+		while ( parent !== start) {
 			results.push(parent);
 			parent = paths[parent];
-
 		}
 
-		// Save the first results for paths without power pill
-		if (this.path === null)
-			this.path = results;
+		results.push(start);
 
+		return results;
 
-		if (powerPillPath)
-			this.path = results;
-
-		if (powerPillPath || !hasMoreRoutes) {
-			console.log(this.path)
-			console.log(this.path.length)
-
-			var event = new CustomEvent('success', { 'detail': {'total': this.path.length, 'data': this.path.reverse()} });
-			window.dispatchEvent(event);
-
-			return true;
-		}
-
-		return false;
-		
 	}
 
   	/*
@@ -211,10 +233,12 @@ window.Maze = window.Maze || (function() {
 		}
 	}
 
-	Maze.prototype.isPowerPill = function(locationId) {
-		if(this.points[locationId] == "PowerPill")
-			return true;
-		return false;
+	Maze.prototype.retry = function() {
+		this.exitPoint 		= null
+		this.path 			= []
+		this.powerPills 	= []
+
+		this.init();		
 	}
 
 	return Maze;

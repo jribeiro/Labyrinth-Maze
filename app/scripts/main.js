@@ -26,7 +26,7 @@
 		**/
 		
 		var $body   = $(document.body);
-
+		var maze 	= null;
 		/*=============================================
 		=          	 01. ELEMENT LISTENERS            =
 		=============================================*/
@@ -42,7 +42,7 @@
 
 			// Allow some time for the animation to kick in
 			setTimeout(function(){
-				new Maze({
+				maze = new Maze({
 					"basePath": 		"http://labyrinth.lbi.co.uk/Maze/Location/"
 				,  	"mazeName": 		userInput
 				,  	"startLocation": 	"start"
@@ -78,6 +78,10 @@
 				dataType: 'json'
 			});
 		});
+
+		$('#retry').on('click', function(){
+			maze.retry();
+		})
 
 
 		/*=============================================
