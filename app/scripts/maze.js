@@ -17,7 +17,7 @@ window.Maze = window.Maze || (function() {
 		this.startLocation 	= args.startLocation;			// Start Location - allows for starting the algorythm other than the normal starting point
 		this.exitPoint 		= null							// Keep a record of the exit point for faster looping
 		this.points 		= {}							// Store the points - this is usefull we need to consider only paths with
-		this.path 			= []							// Stores the path after building the graph
+		this.path 			= null							// Stores the path after building the graph
 
 		this.init();
 
@@ -88,15 +88,15 @@ window.Maze = window.Maze || (function() {
 				for (var z = adjNode.length - 1; z >= 0; z--) {
 					var adjN = adjNode[z];
 
-					if(node == "ce0ff34e-af40-45c3-b9df-751254908253,fd05a2e9-b275-4d3f-933c-99a9a96d6a53")
-						console.log(node)
-
-
-					if (typeof level[adjN] === 'undefined' && typeof parent[adjN] === 'undefined') {
+					if (typeof level[adjN] === 'undefined') {
 						level[adjN] 	= i;
-						parent[adjN] = node;
 						next.push(adjN); 	// Append this to the next processing list
 					}
+
+					if(typeof parent[adjN] === 'undefined' || !parent[adjN])
+						parent[adjN] = [node];
+					else
+						parent[adjN].push(node);
 
 				};
 			};
@@ -105,8 +105,11 @@ window.Maze = window.Maze || (function() {
 			i +=1;
 		}
 
-
-		this.calculatePath(locationId, parent);
+		// Loop through all possible paths
+		while(1) {
+			if (this.calculatePath(locationId, parent))
+				break;
+		}
 	}
 
 
@@ -137,20 +140,46 @@ window.Maze = window.Maze || (function() {
 			return;
 		}
 		
-		var results = [this.exitPoint];
-		var parent 	= paths[this.exitPoint];
+		var results 		= [this.exitPoint];
+		var parent 			= paths[this.exitPoint];
+		var hasMoreRoutes 	= false,
+			powerPillPath 	= false;
 		
 		while ( parent !== null) {
+
+			if(typeof parent == 'object' && parent.length > 1){
+				parent = parent.pop();
+				hasMoreRoutes = true;
+			}
+
+			// Check for PowerPill
+			powerPillPath = this.isPowerPill(parent);
+
 			results.push(parent);
 			parent = paths[parent];
 
 		}
 
-		console.log(results)
-		console.log(results.length)
+		// Save the first results for paths without power pill
+		if (this.path === null)
+			this.path = results;
 
-		var event = new CustomEvent('success', { 'detail': {'total': results.length, 'data': results.reverse()} });
-		window.dispatchEvent(event);
+
+		if (powerPillPath)
+			this.path = results;
+
+		if (powerPillPath || !hasMoreRoutes) {
+			console.log(this.path)
+			console.log(this.path.length)
+
+			var event = new CustomEvent('success', { 'detail': {'total': this.path.length, 'data': this.path.reverse()} });
+			window.dispatchEvent(event);
+
+			return true;
+		}
+
+		return false;
+		
 	}
 
   	/*
@@ -180,6 +209,12 @@ window.Maze = window.Maze || (function() {
 			var event = new CustomEvent('applicationError', { 'detail': 'Maze Name not Available' });
 			window.dispatchEvent(event);
 		}
+	}
+
+	Maze.prototype.isPowerPill = function(locationId) {
+		if(this.points[locationId] == "PowerPill")
+			return true;
+		return false;
 	}
 
 	return Maze;
