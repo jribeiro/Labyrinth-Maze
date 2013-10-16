@@ -118,22 +118,26 @@ window.Maze = window.Maze || (function() {
 
 	Maze.prototype.getPath = function(start) {
 
-		var parents = this.BFS(start);
 		var minLength = -1;
 
 		var power = this.powerPills;
 
 		var point = start;
 		var previous = null;
+		var choosen = [];
 
 		while (point !== null){
+
+			// we need to calculate the paths from every relevant point perspective so we can check what's closer
+			var parents = this.BFS(point);
+
 			var tempRes = null;
 			var next = null;
 
 			for (var i = 0; i < power.length ; i++) {
 
 				// skip already processed
-				if(typeof power[i] === 'undefined')
+				if(typeof choosen[power[i]] !== 'undefined')
 					continue;
 
 				var path = this.calculate(point, power[i], parents);
@@ -145,14 +149,16 @@ window.Maze = window.Maze || (function() {
 			}
 
 			if(tempRes !== null){
-				power[i] = 1;
-				this.path = tempRes.concat(this.path);	
+				this.path = tempRes.concat(this.path);
 			}
+
+			choosen.push(next);
+			choosen[next] = 1;
 			previous = point;
 			point = next;
 		}
 
-		this.path = this.calculate(previous, this.exitPoint, parents).concat(this.path);
+		this.path = this.calculate(previous, this.exitPoint, this.BFS(previous)).concat(this.path);
 
 		if (this.path.length !== 0) 
 			this.path.unshift(this.exitPoint);
