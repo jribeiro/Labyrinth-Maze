@@ -97,7 +97,6 @@ window.Maze = window.Maze || (function() {
 				var adjNode = this.getAdj(node);
 
 				/* Checking every single location as we may be missing out on possibilities otherwise */
-
 				for (var z = adjNode.length - 1; z >= 0; z--) {
 					var adjN = adjNode[z];
 
@@ -120,32 +119,43 @@ window.Maze = window.Maze || (function() {
 	Maze.prototype.getPath = function(start) {
 
 		var parents = this.BFS(start);
+		var minLength = -1;
 
-		if(this.powerPills.length === 0){
-			// No Power Pill in Maze, find the fastest route from S => E
-			this.path = this.calculate(start, this.exitPoint, parents);
+		var power = this.powerPills;
+
+		var point = start;
+		var previous = null;
+
+		while (point !== null){
+			var tempRes = null;
+			var next = null;
+
+			for (var i = 0; i < power.length ; i++) {
+
+				// skip already processed
+				if(typeof power[i] === 'undefined')
+					continue;
+
+				var path = this.calculate(point, power[i], parents);
+
+				if(path.length > 0 && (tempRes === null || path.length < tempRes.length)) {
+					tempRes = path;
+					next = power[i];
+				}
+			}
+
+			if(tempRes !== null){
+				power[i] = 1;
+				this.path = tempRes.concat(this.path);	
+			}
+			previous = point;
+			point = next;
 		}
 
-		else {
-			var minLength = -1;
+		this.path = this.calculate(previous, this.exitPoint, parents).concat(this.path);
 
-			for (var i = this.powerPills.length - 1; i >= 0; i--) {
-				// loop through each powerPill, check the shortest route that satisfies S => PP and PP => E
-				var pillParents = this.BFS(this.powerPills[i]);
-
-				var startToPill = this.calculate(start, this.powerPills[i], parents);
-				var pillToExit 	= this.calculate(this.powerPills[i], this.exitPoint, pillParents);
-
-				// Remove Power Pill from the middle to avoid duplication
-				pillToExit.pop();
-
-				var result = pillToExit.concat(startToPill);
-
-				if(minLength == -1 || result.length < minLength)
-					this.path = result;
-			};
-			
-		}
+		if (this.path.length !== 0) 
+			this.path.unshift(this.exitPoint);
 
 		console.log(this.path)
 		console.log(this.path.length)
@@ -190,7 +200,7 @@ window.Maze = window.Maze || (function() {
 			return;
 		}
 		
-		var results = [exit];
+		var results = [];
 		var parent 	= paths[exit];
 		
 		while ( parent !== start) {
@@ -234,9 +244,10 @@ window.Maze = window.Maze || (function() {
 	}
 
 	Maze.prototype.retry = function() {
-		this.exitPoint 		= null
 		this.path 			= []
-		this.powerPills 	= []
+		for (var i = this.powerPills.length - 1; i >= 0; i--) {
+			this.powerPills[i] = undefined;
+		};
 
 		this.init();		
 	}
