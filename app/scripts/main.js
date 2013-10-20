@@ -16,14 +16,6 @@
 	$(function(){
 
 		var userInput = "";
-
-		/**
-		
-			TODO:
-			- Move to Vanilla JS
-			- Structure the code
-		
-		**/
 		
 		var $body   = $(document.body);
 		var maze 	= null;
@@ -60,6 +52,7 @@
 			var resultElem = document.getElementById('result-path');
 			var data = resultElem.innerHTML;
 
+			/*
 			var jsonData = {
 		  		"player_name": "João Ribeiro"
 			,	"email_address": "me@joaoribeiro.me"
@@ -76,7 +69,7 @@
 				  	$('#success p').replaceWith('<p>'+data+'</p>');
 				},
 				dataType: 'json'
-			});
+			}); */
 		});
 
 		$('#retry').on('click', function(){
@@ -97,7 +90,6 @@
 
 		window.addEventListener('success', function(e){
 
-			console.log(e);
 			document.body.className = "success";
 
 			var totalElem = document.getElementById('total-steps');

@@ -6,7 +6,8 @@
  * Date: 13-10-2013
  */
 
-window.Maze = window.Maze || (function() {
+window.Maze = window.Maze || (function() 
+{
   
 	/* 
 	* Constructor
@@ -19,6 +20,8 @@ window.Maze = window.Maze || (function() {
 		this.points 		= {}							// Store the points - this is usefull we need to consider only paths with
 		this.path 			= []							// Stores the path after building the graph
 		this.powerPills 	= []
+		this.processedGraphs = []
+		this.checkpointsPaths = []
 
 		this.init();
 
@@ -31,7 +34,12 @@ window.Maze = window.Maze || (function() {
 
 		var startPoint = this.getLocation(this.startLocation);
 		if(typeof startPoint !== 'undefined') {
-			this.getPath(startPoint.id);
+			this.getPath(startPoint.id, [], []);
+
+			var event = new CustomEvent('success', { 'detail': {'total': this.path.length, 'data': this.path} });
+			window.dispatchEvent(event);
+
+			//this.getPath2(startPoint.id);
 		}
 		else{
 			var event = new CustomEvent('applicationError', { 'detail': 'Maze Name not Available' });
@@ -39,139 +47,150 @@ window.Maze = window.Maze || (function() {
 		}
 	};
 
-	Maze.prototype.getLocation = function(location){
-		var xmlhttp,
-			data,
-			self = this;
 
-		// Sorry IE5/6 I really don't care bout you
-		xmlhttp = new XMLHttpRequest();
+	/*
+	* Shortest path between multiple points algorithm
+	*/
+	Maze.prototype.getPath = function (start, visited, result) 
+	{
 
-		xmlhttp.onreadystatechange = function() {
-		    if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
-		        // Cache each request to avoid extra processing
-		        data = JSON.parse(xmlhttp.responseText);
+		var path 	= []
+		,	parents = this.BFS(start);
 
-		        self.points[data.LocationId] = {
-		        	"id": data.LocationId
-		        ,	"adj": 	self.exitsToLocations(data.Exits)
-		        ,	"type": data.LocationType
-		        };
+		visited.push(start);
 
-		        if(data.LocationType == 'PowerPill')
-					self.powerPills.push(data.LocationId)
-				else if (data.LocationType == 'Exit')
-					self.exitPoint = data.LocationId;
+		// Final path:  S => E or C => E
+		if(visited.length > this.powerPills.length)
+		{
+			var finale = this.calculate(start, this.exitPoint, parents);
+			finale.push(this.exitPoint);
 
+			result = result.concat(finale);
 
-		    }
+			if(finale.length > 1 && (result.length < this.path.length || this.path.length == 0))
+				this.path = result.slice(0);
+
+			// Nothing else to see here
+			return;
+		}
+
+		// Let's search for all combos
+		for (var i = 0; i < this.powerPills.length; i++) 
+		{
+		
+			var checkpoint = this.powerPills[i];
+			if (visited.indexOf(checkpoint) === -1)
+			{
+
+				var checkpointPath = this.calculate(start, checkpoint, parents);
+				var tempRes = result.concat(checkpointPath);
+
+				if (checkpointPath.length !== 0 && (this.path.length == 0 || this.path.length > tempRes.length))
+				{
+
+					// recursively calculate the next possible paths
+					this.getPath(checkpoint, visited.slice(0), tempRes);
+												
+				}
+				else
+					return;
+
+			}
+
 		};
 
-		xmlhttp.open("GET", this.buildAjaxUrl(location), false);
-		xmlhttp.send();
-		
-		return self.points[data.LocationId];
-	};
+	}
 
-	/* Based on Prof. Erik Demaine MIT lecture on Breadth-First Search: http://www.youtube.com/watch?v=s-CYnVz-uh4 */
-	Maze.prototype.BFS = function (start) {
-		var level 		= {} 					// start-location = level 0
-		,	parents		= {}
-		,	i 			= 1
-		,	frontier 	= [start]
-		;
+	/*
+	* Calculates the shortest path between two points
+	*/
+	Maze.prototype.calculate = function (start, checkpoint, paths) 
+	{
 
-		// set vars with starting points
-		level[start] 	= 0;
-		parents[start]	= null;
+		if(typeof this.checkpointsPaths[checkpoint] === 'undefined' || typeof this.checkpointsPaths[checkpoint][start] === 'undefined')
+		{
+			
+			// well we need to do some heavy lifting
+			var results = [];
+			var parent 	= paths[checkpoint];
 
-		while(0 < frontier.length) {
-			var next = [];
+			/**
+			 * IF:
+			 *   start: path found
+			 *   undefined: no path found 
+			 **/
+			
+			while ( parent !== start && typeof parent !== undefined) {
+				results.unshift(parent);
+				parent = paths[parent];
+			}
 
-			for (var j = frontier.length - 1; j >= 0; j--) {
-				var node 	= frontier[j];
+			if(typeof parent === undefined)
+				results = [];
 
-				if(typeof node === 'object')
-					node = node[0];
+			results.unshift(start);
 
-				var adjNode = this.getAdj(node);
+			if(typeof this.checkpointsPaths[checkpoint] === 'undefined')
+				this.checkpointsPaths[checkpoint] = [];
+			this.checkpointsPaths[checkpoint][start] = results;
+			
+		}
 
-				/* Checking every single location as we may be missing out on possibilities otherwise */
-				for (var z = adjNode.length - 1; z >= 0; z--) {
-					var adjN = adjNode[z];
+		return this.checkpointsPaths[checkpoint][start];
+	}
 
-					if (typeof level[adjN] === 'undefined') {
-						level[adjN] 	= i;
-						parents[adjN] = node;
-						next.push(adjN); 	// Append this to the next processing list
-					}
+	/*
+	* Build the tree based on a start point
+	*/
+	Maze.prototype.BFS = function (start) 
+	{
 
+		var parents = this.processedGraphs[start];
+
+		if(typeof parents === 'undefined') 
+		{
+
+			var parents		= {}
+			,	frontier 	= [start]
+
+			parents[start]	= null
+
+			while(0 < frontier.length) {
+				var next = [];
+
+				for (var j = frontier.length - 1; j >= 0; j--) {
+					var node 	= frontier[j]
+
+					/*
+					if(typeof node === 'object')
+						node = node[0];
+					*/
+
+					var adjNode = this.getAdj(node);
+
+					/* Checking every single location as we may be missing out on possibilities otherwise */
+					for (var z = adjNode.length - 1; z >= 0; z--) {
+						var adj = adjNode[z];
+
+						if (typeof parents[adj] === 'undefined') {
+							parents[adj] = node;
+							next.push(adj); 	// Append this to the next processing list
+						}
+
+					};
 				};
-			};
 
-			frontier = next;
-			i +=1;
+				frontier = next;
+			}
+			this.processedGraphs[start] = parents;
 		}
 
 		return parents;
 	}
 
-	Maze.prototype.getPath = function(start) {
-
-		var minLength = -1;
-
-		var power = this.powerPills;
-
-		var point = start;
-		var previous = null;
-		var choosen = [];
-
-		while (point !== null){
-
-			// we need to calculate the paths from every relevant point perspective so we can check what's closer
-			var parents = this.BFS(point);
-
-			var tempRes = null;
-			var next = null;
-
-			for (var i = 0; i < power.length ; i++) {
-
-				// skip already processed
-				if(typeof choosen[power[i]] !== 'undefined')
-					continue;
-
-				var path = this.calculate(point, power[i], parents);
-
-				if(path.length > 0 && (tempRes === null || path.length < tempRes.length)) {
-					tempRes = path;
-					next = power[i];
-				}
-			}
-
-			if(tempRes !== null){
-				this.path = tempRes.concat(this.path);
-			}
-
-			choosen.push(next);
-			choosen[next] = 1;
-			previous = point;
-			point = next;
-		}
-
-		this.path = this.calculate(previous, this.exitPoint, this.BFS(previous)).concat(this.path);
-
-		if (this.path.length !== 0) 
-			this.path.unshift(this.exitPoint);
-
-		console.log(this.path)
-		console.log(this.path.length)
-
-		var event = new CustomEvent('success', { 'detail': {'total': this.path.length, 'data': this.path.reverse()} });
-		window.dispatchEvent(event);
-
-	}
-
-
+	/*
+	* Gets the adjency list of a location from cache or fetches it from the server if not cached already
+	*/
 	Maze.prototype.getAdj = function(location) {
 		
 		var adj;
@@ -198,27 +217,44 @@ window.Maze = window.Maze || (function() {
 		return adj;
 	}
 
-	Maze.prototype.calculate = function (start, exit, paths) {
-		
-		if (exit == null) {
-			var event = new CustomEvent('applicationError', { 'detail': "I'm lossssst"});
-			window.dispatchEvent(event);
-			return;
-		}
-		
-		var results = [];
-		var parent 	= paths[exit];
-		
-		while ( parent !== start) {
-			results.push(parent);
-			parent = paths[parent];
-		}
+	/*
+	* Fetches a location from the remote server
+	*/
+	Maze.prototype.getLocation = function(location){
+		var xmlhttp,
+			data,
+			self = this;
 
-		results.push(start);
+		// Sorry IE5/6 I really don't care bout you
+		xmlhttp = new XMLHttpRequest();
 
-		return results;
+		xmlhttp.onreadystatechange = function() {
+		    if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
+		        // Cache each request to avoid extra processing
+		        data = JSON.parse(xmlhttp.responseText);
 
-	}
+
+		        // wtf moment - why process the info?? 
+		        self.points[data.LocationId] = {
+		        	"id": data.LocationId
+		        ,	"adj": 	self.exitsToLocations(data.Exits)
+		        ,	"type": data.LocationType
+		        };
+
+		        if(data.LocationType == 'PowerPill')
+					self.powerPills.push(data.LocationId)
+				else if (data.LocationType == 'Exit')
+					self.exitPoint = data.LocationId;
+
+
+		    }
+		};
+
+		xmlhttp.open("GET", this.buildAjaxUrl(location), false);
+		xmlhttp.send();
+		
+		return self.points[data.LocationId];
+	};
 
   	/*
    	 * Builds url for ajax calls
@@ -227,6 +263,9 @@ window.Maze = window.Maze || (function() {
     	return this.basePath + this.mazeName + '/' + location + '/json';
   	};
 
+  	/*
+   	 * Extracts the ids from the urls
+   	 */
   	Maze.prototype.exitsToLocations = function (exits) {
   		var locArr = [];
 
@@ -260,11 +299,3 @@ window.Maze = window.Maze || (function() {
 
 	return Maze;
 })();
-
-/*
-new Maze({
-	"basePath": 		"http://labyrinth.lbi.co.uk/Maze/Location/"
-,  	"mazeName": 		"easy"
-,  	"startLocation": 	"start"
-});
-*/
