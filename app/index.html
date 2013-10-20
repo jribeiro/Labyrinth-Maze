@@ -32,7 +32,14 @@
                 <form id="maze-form" role="form" class="height-changes-trans">
                     <div class="form-group">
                         <label for="maze">Maze Name</label>
-                        <input required type="maze" class="form-control" id="maze-input" placeholder="easy">
+                        <select name="maze" class="form-control" id="maze-input" required>
+                            <option selected>easy</option>
+                            <option>pacman</option>
+                            <option>glasgow</option>
+                            <option>chucknorris</option>
+                            <option>lucifer</option>
+                            <option>thedaddy</option>
+                        </select>
                     </div>
                     <button type="submit" class="btn btn-primary">Submit</button>
                 </form>

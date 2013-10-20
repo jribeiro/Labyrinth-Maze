@@ -6,7 +6,8 @@
  * Date: 13-10-2013
  */
 
-window.Maze = window.Maze || (function() {
+window.Maze = window.Maze || (function() 
+{
   
 	/* 
 	* Constructor
@@ -19,6 +20,8 @@ window.Maze = window.Maze || (function() {
 		this.points 		= {}							// Store the points - this is usefull we need to consider only paths with
 		this.path 			= []							// Stores the path after building the graph
 		this.powerPills 	= []
+		this.processedGraphs = []
+		this.checkpointsPaths = []
 
 		this.init();
 
@@ -31,7 +34,12 @@ window.Maze = window.Maze || (function() {
 
 		var startPoint = this.getLocation(this.startLocation);
 		if(typeof startPoint !== 'undefined') {
-			this.getPath(startPoint.id);
+			this.getPath(startPoint.id, [], []);
+
+			var event = new CustomEvent('success', { 'detail': {'total': this.path.length, 'data': this.path} });
+			window.dispatchEvent(event);
+
+			//this.getPath2(startPoint.id);
 		}
 		else{
 			var event = new CustomEvent('applicationError', { 'detail': 'Maze Name not Available' });
@@ -52,6 +60,8 @@ window.Maze = window.Maze || (function() {
 		        // Cache each request to avoid extra processing
 		        data = JSON.parse(xmlhttp.responseText);
 
+
+		        // wtf moment - why process the info?? 
 		        self.points[data.LocationId] = {
 		        	"id": data.LocationId
 		        ,	"adj": 	self.exitsToLocations(data.Exits)
@@ -74,49 +84,107 @@ window.Maze = window.Maze || (function() {
 	};
 
 	/* Based on Prof. Erik Demaine MIT lecture on Breadth-First Search: http://www.youtube.com/watch?v=s-CYnVz-uh4 */
-	Maze.prototype.BFS = function (start) {
-		var level 		= {} 					// start-location = level 0
-		,	parents		= {}
-		,	i 			= 1
-		,	frontier 	= [start]
-		;
+	Maze.prototype.BFS = function (start) 
+	{
 
-		// set vars with starting points
-		level[start] 	= 0;
-		parents[start]	= null;
+		var parents = this.processedGraphs[start];
 
-		while(0 < frontier.length) {
-			var next = [];
+		if(typeof parents === 'undefined') 
+		{
 
-			for (var j = frontier.length - 1; j >= 0; j--) {
-				var node 	= frontier[j];
+			var parents		= {}
+			,	frontier 	= [start]
 
-				if(typeof node === 'object')
-					node = node[0];
+			parents[start]	= null
 
-				var adjNode = this.getAdj(node);
+			while(0 < frontier.length) {
+				var next = [];
 
-				/* Checking every single location as we may be missing out on possibilities otherwise */
-				for (var z = adjNode.length - 1; z >= 0; z--) {
-					var adjN = adjNode[z];
+				for (var j = frontier.length - 1; j >= 0; j--) {
+					var node 	= frontier[j]
 
-					if (typeof level[adjN] === 'undefined') {
-						level[adjN] 	= i;
-						parents[adjN] = node;
-						next.push(adjN); 	// Append this to the next processing list
-					}
+					/*
+					if(typeof node === 'object')
+						node = node[0];
+					*/
 
+					var adjNode = this.getAdj(node);
+
+					/* Checking every single location as we may be missing out on possibilities otherwise */
+					for (var z = adjNode.length - 1; z >= 0; z--) {
+						var adj = adjNode[z];
+
+						if (typeof parents[adj] === 'undefined') {
+							parents[adj] = node;
+							next.push(adj); 	// Append this to the next processing list
+						}
+
+					};
 				};
-			};
 
-			frontier = next;
-			i +=1;
+				frontier = next;
+			}
+			this.processedGraphs[start] = parents;
 		}
 
 		return parents;
 	}
 
-	Maze.prototype.getPath = function(start) {
+
+	/*
+	* Dynamic Programming 
+	*/
+	Maze.prototype.getPath = function (start, visited, result) 
+	{
+
+		var path 	= []
+		,	parents = this.BFS(start);
+
+		visited.push(start);
+
+		// Final path:  S => E or C => E
+		if(visited.length > this.powerPills.length)
+		{
+			var finale = this.calculate(start, this.exitPoint, parents);
+			finale.push(this.exitPoint);
+
+			result = result.concat(finale);
+
+			if(finale.length > 1 && (result.length < this.path.length || this.path.length == 0))
+				this.path = result.slice(0);
+
+			// Nothing else to see here
+			return;
+		}
+
+		// Let's search for all combos
+		for (var i = 0; i < this.powerPills.length; i++) 
+		{
+		
+			var checkpoint = this.powerPills[i];
+			if (visited.indexOf(checkpoint) === -1)
+			{
+
+				var checkpointPath = this.calculate(start, checkpoint, parents);
+				var tempRes = result.concat(checkpointPath);
+
+				if (checkpointPath.length !== 0 && (this.path.length == 0 || this.path.length > tempRes.length))
+				{
+
+					// recursively calculate the next possible paths
+					this.getPath(checkpoint, visited.slice(0), tempRes);
+												
+				}
+				else
+					return;
+
+			}
+
+		};
+
+	}
+
+	Maze.prototype.getPath2 = function(start) {
 
 		var minLength = -1;
 
@@ -149,24 +217,23 @@ window.Maze = window.Maze || (function() {
 			}
 
 			if(tempRes !== null){
-				this.path = tempRes.concat(this.path);
+				this.path = this.path.concat(tempRes);
 			}
 
 			choosen.push(next);
+
+			// WTF?
 			choosen[next] = 1;
 			previous = point;
 			point = next;
 		}
 
-		this.path = this.calculate(previous, this.exitPoint, this.BFS(previous)).concat(this.path);
+		this.path = this.path.concat(this.calculate(previous, this.exitPoint, this.BFS(previous)));
 
 		if (this.path.length !== 0) 
-			this.path.unshift(this.exitPoint);
+			this.path.push(this.exitPoint);
 
-		console.log(this.path)
-		console.log(this.path.length)
-
-		var event = new CustomEvent('success', { 'detail': {'total': this.path.length, 'data': this.path.reverse()} });
+		var event = new CustomEvent('success', { 'detail': {'total': this.path.length, 'data': this.path} });
 		window.dispatchEvent(event);
 
 	}
@@ -198,26 +265,39 @@ window.Maze = window.Maze || (function() {
 		return adj;
 	}
 
-	Maze.prototype.calculate = function (start, exit, paths) {
-		
-		if (exit == null) {
-			var event = new CustomEvent('applicationError', { 'detail': "I'm lossssst"});
-			window.dispatchEvent(event);
-			return;
+	Maze.prototype.calculate = function (start, checkpoint, paths) 
+	{
+
+		if(typeof this.checkpointsPaths[checkpoint] === 'undefined' || typeof this.checkpointsPaths[checkpoint][start] === 'undefined')
+		{
+			
+			// well we need to do some heavy lifting
+			var results = [];
+			var parent 	= paths[checkpoint];
+
+			/**
+			 * IF:
+			 *   start: path found
+			 *   undefined: no path found 
+			 **/
+			
+			while ( parent !== start && typeof parent !== undefined) {
+				results.unshift(parent);
+				parent = paths[parent];
+			}
+
+			if(typeof parent === undefined)
+				results = [];
+
+			results.unshift(start);
+
+			if(typeof this.checkpointsPaths[checkpoint] === 'undefined')
+				this.checkpointsPaths[checkpoint] = [];
+			this.checkpointsPaths[checkpoint][start] = results;
+			
 		}
-		
-		var results = [];
-		var parent 	= paths[exit];
-		
-		while ( parent !== start) {
-			results.push(parent);
-			parent = paths[parent];
-		}
 
-		results.push(start);
-
-		return results;
-
+		return this.checkpointsPaths[checkpoint][start];
 	}
 
   	/*
